@@ -11,9 +11,18 @@ if (!fs.existsSync(videosDir)){
   fs.mkdirSync(videosDir);
 }
 
+const referencesDir = path.join(__dirname, 'references');
+if (!fs.existsSync(referencesDir)){
+  fs.mkdirSync(referencesDir);
+}
+
+const filePath = './references/allVideosInfo.json';
+
+const jsdom = require('jsdom');
+const { JSDOM } = jsdom;
+
 async function getVideos() {
     const videoLinks = [];
-    
     try {
         const response = await axios.get(URL);
         const html = response.data;
@@ -54,25 +63,29 @@ async function downloadAllVideos(videoLinks) {
 async function processVideos() {
     const videoGoodLinks = [];
     const videoBadLinks = [];
-
+    const videoLinksInfo = [];
     try {
-        const data = await getVideos(); // Wait for getVideos to resolve and get the data directly
+        const data = await getVideos(); 
     
         for (const source of data) {
           try {
-            const info = await ytdl.getInfo(source); // Wait for ytdl.getInfo to resolve
+            const info = await ytdl.getInfo(source); 
+            const title = info.videoDetails.title;
             videoGoodLinks.push(source);
+            videoLinksInfo.push({ source, title });
             console.log('Video info retrieved:', info.videoDetails.title);
           } catch (error) {
             videoBadLinks.push(source);
             console.error('Error fetching video information for:', source, error);
-            // Continue to the next video despite the error
           }
         }
         console.log('All videos processed.');
 
         try {
-            await downloadAllVideos(videoGoodLinks); // Wait for downloadAllVideos to complete
+            await downloadAllVideos(videoGoodLinks);
+            const dataToWrite = JSON.stringify(videoLinksInfo, null, 2);
+            fs.writeFileSync(filePath, dataToWrite);
+            console.log('File written successfully');
             console.log('All videos downloaded.');
         } catch (downloadError) {
             console.error('Error downloading videos:', downloadError);

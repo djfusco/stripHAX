@@ -10,32 +10,55 @@ if (!fs.existsSync(imagesDir)){
   fs.mkdirSync(imagesDir);
 }
 
-axios.get(URL)
-  .then(response => {
+const referencesDir = path.join(__dirname, 'references');
+if (!fs.existsSync(referencesDir)){
+  fs.mkdirSync(referencesDir);
+}
+
+const filePath = './references/allImagesInfo.json';
+
+const jsdom = require('jsdom');
+const { JSDOM } = jsdom;
+
+async function fetchAndProcessImages(url) {
+  try {
+    const response = await axios.get(url);
     const html = response.data;
     const $ = cheerio.load(html);
     const imageLinks = [];
+    const imageLinksInfo = [];
 
     $('media-image').each((i, link) => {
       const source = $(link).attr('source');
+      const modalTitle = $(link).attr('modal-title');
       imageLinks.push(source);
+      imageLinksInfo.push({ source, modalTitle });
     });
 
     console.log(imageLinks);
 
-    imageLinks.forEach((link, index) => {
-      axios({
-        method: 'get',
-        url: link,
-        responseType: 'stream'
-      })
-      .then(response => {
+    const fetchPromises = imageLinks.map(async (link, index) => {
+      try {
+        const response = await axios({
+          method: 'get',
+          url: link,
+          responseType: 'stream',
+        });
         const imagePath = path.join(imagesDir, `image${index}.jpg`);
         response.data.pipe(fs.createWriteStream(imagePath));
-
-      })
-      .catch(console.error);
+      } catch (error) {
+        console.error(error);
+      }
     });
-    
-  })
-  .catch(console.error);
+
+    await Promise.all(fetchPromises);
+
+    const dataToWrite = JSON.stringify(imageLinksInfo, null, 2);
+    fs.writeFileSync(filePath, dataToWrite);
+    console.log('File written successfully');
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+fetchAndProcessImages(URL);
